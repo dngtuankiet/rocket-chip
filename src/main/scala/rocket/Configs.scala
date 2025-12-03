@@ -10,6 +10,48 @@ import freechips.rocketchip.subsystem.{TilesLocated, NumTiles, HierarchicalLocat
 import freechips.rocketchip.tile.{RocketTileParams, RocketTileBoundaryBufferParams, FPUParams}
 import scala.reflect.ClassTag
 
+class WithNRV32ICores(
+  n: Int,
+  crossing: RocketCrossingParams = RocketCrossingParams(),
+) extends Config((site, here, up) => {
+  case TilesLocated(InSubsystem) => {
+    val prev = up(TilesLocated(InSubsystem), site)
+    val idOffset = up(NumTiles)
+    val med = RocketTileParams(
+    core = RocketCoreParams(
+    xLen = 32,
+    pgLevels = 2,
+    useVM = false,
+    fpu = None,
+    // mulDiv = Some(MulDivParams(mulUnroll = 8)),
+    mulDiv = None,
+    useAtomics = false,
+    useCompressed = false
+    ),
+    btb = None,
+    dcache = Some(DCacheParams(
+    rowBits = site(SystemBusKey).beatBits,
+    nSets = 32,
+    nWays = 1,
+    nTLBSets = 1,
+    nTLBWays = 4,
+    nMSHRs = 0,
+    blockBytes = site(CacheBlockBytes))),
+    icache = Some(ICacheParams(
+    rowBits = site(SystemBusKey).beatBits,
+    nSets = 32,
+    nWays = 1,
+    nTLBSets = 1,
+    nTLBWays = 4,
+    blockBytes = site(CacheBlockBytes))))
+    List.tabulate(n)(i => RocketTileAttachParams(
+    med.copy(tileId = i + idOffset),
+    crossing
+    )) ++ prev
+  }
+  case NumTiles => up(NumTiles) + n
+})
+
 // All the user-level bells and whistles
 class WithNHugeCores(
   n: Int,
